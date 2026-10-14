@@ -601,7 +601,7 @@ export function buildWorld(city) {
       props.box(sx + 0.8, h + 2.6, sz + 0.8, sx + 2.2, h + 3.0, sz + 1.8, C('#6d7075'));
     }
     // helipad on large towers
-    if (style === 0 && area >= 140 && lr.chance(0.5)) {
+    if (style === 0 && area >= 140 && lr.chance(0.3)) {
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
       flat.rect(cx - 3.6, cz - 3.6, cx + 3.6, cz + 3.6, h + 0.03, C('#3b3e42'), 3);
       flat.fan(cx, cz, h + 0.05, 3.0, 24, C('#e1bf3a'), 3, 2.7);
@@ -664,7 +664,8 @@ export function buildWorld(city) {
       continue;
     }
     const g = greens[Math.floor(rf() * greens.length)];
-    props.box(t.x - 0.2, 0, t.z - 0.2, t.x + 0.2, t.h * 0.6, t.z + 0.2, C('#5d4632'));
+    // short trunk: from straight above a tall one reads as a stick poking out of the canopy
+    props.box(t.x - 0.18, 0, t.z - 0.18, t.x + 0.18, Math.min(1.4, t.h * 0.3), t.z + 0.18, C('#5d4632'));
     props.blob(t.x, t.h, t.z, t.r, 0.72, g, rf, t.r > 2.1 ? 1 : 0);
     props.blob(t.x + t.r * 0.45, t.h + 0.3, t.z - t.r * 0.35, t.r * 0.62, 0.8, mul(g, 1.1), rf, 0);
     shadows.circle(t.x + SHADOW_DX * t.h, t.z + SHADOW_DZ * t.h, t.r * 0.95, 0.03, 9);
@@ -673,11 +674,13 @@ export function buildWorld(city) {
   // ---------------------------------------------------------- street furniture
   for (const l of city.lamps) {
     props.at(l.x, l.z);
-    const pole = C('#3e4147');
-    props.box(l.x - 0.09, 0, l.z - 0.09, l.x + 0.09, 5.0, l.z + 0.09, pole);
-    const ex = l.x + l.dx * 1.4, ez = l.z + l.dz * 1.4;
-    props.box(Math.min(l.x, ex) - 0.06, 4.85, Math.min(l.z, ez) - 0.06, Math.max(l.x, ex) + 0.06, 5.0, Math.max(l.z, ez) + 0.06, pole);
-    props.box(ex - 0.3, 4.7, ez - 0.3, ex + 0.3, 4.95, ez + 0.3, C('#d9d5c6'), C('#9a978e'));
+    const pole = C('#7a7e85');
+    props.box(l.x - 0.07, 0, l.z - 0.07, l.x + 0.07, 4.2, l.z + 0.07, pole);
+    const ex = l.x + l.dx * 1.1, ez = l.z + l.dz * 1.1;
+    props.box(Math.min(l.x, ex) - 0.05, 4.1, Math.min(l.z, ez) - 0.05, Math.max(l.x, ex) + 0.05, 4.2, Math.max(l.z, ez) + 0.05, pole);
+    props.box(ex - 0.26, 3.98, ez - 0.26, ex + 0.26, 4.18, ez + 0.26, C('#e6e1cf'), C('#a6a397'));
+    shadows.at(l.x, l.z);
+    shadows.circle(ex + SHADOW_DX * 4, ez + SHADOW_DZ * 4, 0.3, 0.03, 6);
   }
   for (const p of city.phones) {
     props.at(p.x, p.z); shadows.at(p.x, p.z);
@@ -703,6 +706,38 @@ export function buildWorld(city) {
       props.prism(p.x, p.z, 0.28, 0, 0.8, 8, C('#2f3236'), C('#d3b23a'));
     }
   }
+
+  // ---------------------------------------------------------- night lights (street lamp pools)
+  const glowPos = [], glowUv = [], glowIdx = [];
+  const addGlow = (x, y, z, r) => {
+    const n = glowPos.length / 3;
+    glowPos.push(x - r, y, z - r, x - r, y, z + r, x + r, y, z + r, x + r, y, z - r);
+    glowUv.push(0, 0, 0, 1, 1, 1, 1, 0);
+    glowIdx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+  };
+  for (const l of city.lamps) {
+    const ex = l.x + l.dx * 1.1, ez = l.z + l.dz * 1.1;
+    addGlow(ex, 0.05, ez, 6.0);
+    addGlow(ex, 4.25, ez, 0.9);
+  }
+  for (const p of city.phones) addGlow(p.x, 2.5, p.z, 1.2);
+  const glowGeo = new THREE.BufferGeometry();
+  glowGeo.setAttribute('position', new THREE.Float32BufferAttribute(glowPos, 3));
+  glowGeo.setAttribute('uv', new THREE.Float32BufferAttribute(glowUv, 2));
+  glowGeo.setIndex(glowIdx);
+  glowGeo.computeBoundingSphere();
+  const glowMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uNight: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform float uNight; varying vec2 vUv;
+      void main(){ float d = length(vUv - 0.5) * 2.0; float a = pow(max(0.0, 1.0 - d), 2.0) * uNight * 0.9;
+        gl_FragColor = vec4(vec3(1.0, 0.8, 0.5) * a, a); }`,
+  });
+  const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+  glowMesh.frustumCulled = false;
+  glowMesh.renderOrder = 4;
+  glowMesh.visible = false;
 
   // ---------------------------------------------------------- water
   const VW = W + 1;
@@ -761,7 +796,7 @@ export function buildWorld(city) {
   add(props.build(mats.props));
   add(shadows.build(mats.shadow), 1);
   waterMesh.renderOrder = -1;
-  group.add(waterMesh, seaMesh);
+  group.add(waterMesh, seaMesh, glowMesh);
   void groundMeshes;
 
   // roof signs for special buildings
@@ -788,6 +823,9 @@ export function buildWorld(city) {
         mats[k].uniforms.uTint.value.copy(tint);
       }
       mats.props.color.copy(tint);
+      mats.shadow.opacity = 0.3 * (1 - n * 0.65);
+      glowMat.uniforms.uNight.value = n;
+      glowMesh.visible = n > 0.02;
     },
   };
 }

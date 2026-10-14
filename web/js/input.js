@@ -59,7 +59,7 @@ export class Input {
       this.stick.ox = e.clientX; this.stick.oy = e.clientY;
       base.style.transform = `translate(${e.clientX - r.left}px, ${e.clientY - r.top}px)`;
       base.classList.add('on');
-      zone.setPointerCapture?.(e.pointerId);
+      try { zone.setPointerCapture?.(e.pointerId); } catch { /* synthetic or stale pointer */ }
       this.moveStick(e);
     };
     const onMove = (e) => { if (e.pointerId === this.stick.id) { e.preventDefault(); this.moveStick(e); } };
@@ -74,7 +74,7 @@ export class Input {
         e.preventDefault();
         this.touchMode = true;
         el.classList.add('down');
-        el.setPointerCapture?.(e.pointerId);
+        try { el.setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
         if (kind === 'hold') this.held[name] = true;
         this.press(name);
         navigator.vibrate?.(8);

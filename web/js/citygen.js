@@ -301,7 +301,8 @@ export function generateCity(seed = 1015) {
     return bld;
   }
   function addTree(x, z, kind = 'round', r = rng.range(1.6, 2.6)) {
-    trees.push({ x, z, r, h: r * 2.2 + rng.range(1, 3), kind, seed: rng.next() });
+    const h = kind === 'palm' ? r * 2.4 + rng.range(2, 3.5) : r * 1.5 + rng.range(1.2, 2.2);
+    trees.push({ x, z, r, h, kind, seed: rng.next() });
   }
 
   for (const b of regular) {
@@ -521,7 +522,7 @@ export function generateCity(seed = 1015) {
   const lamps = [];
   for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
     if (tiles[id(x, z)] !== T.SIDEWALK) continue;
-    if ((x * 7 + z * 13) % 4 !== 0) continue;
+    if ((x * 7 + z * 13) % 6 !== 0) continue;
     const roads = [];
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (get(x + dx, z + dz) === T.ROAD) roads.push([dx, dz]);
     if (roads.length !== 1) continue;

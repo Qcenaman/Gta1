@@ -17,6 +17,7 @@ export const PICKUP_TYPES = {
 };
 
 let atlas = null;
+const WHITE = new THREE.Color(1, 1, 1);
 const ORDER = Object.keys(PICKUP_TYPES);
 
 export function drawIcon(g, type, x, y, s) {
@@ -145,6 +146,7 @@ export class Pickups {
         continue;
       }
       it.mesh.rotation.y = t * 1.6 + it.x;
+      if (G.light.tint) it.mesh.material.color.copy(G.light.tint).lerp(WHITE, 0.35);
       it.mesh.position.y = 0.75 + Math.sin(t * 3 + it.z) * 0.18;
       if (!pl || !pl.alive) continue;
       const e = pl.inCar ? pl.vehicle : pl.ped;

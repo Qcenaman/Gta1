@@ -223,7 +223,9 @@ export function explode(x, z, radius, damage, source) {
     const d = Math.hypot(p.x - x, p.z - z);
     if (d > radius) continue;
     const k = Math.pow(1 - d / radius, 0.7);
-    p.hit(damage * k, p.x - x + 0.01, p.z - z, source, 'explosion');
+    // your own blasts hurt, but rarely one-shot you
+    const self = p.kind === 'player' && source === 'player' ? 0.35 : 1;
+    p.hit(damage * k * self, p.x - x + 0.01, p.z - z, source, 'explosion');
     if (rand() < 0.6) p.onFire = Math.max(p.onFire, 1.5);
   }
   for (const v of G.vehicles) {

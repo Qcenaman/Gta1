@@ -29,8 +29,10 @@ export const G = {
     music: true,
     quality: 'auto', // auto | high | low
     leftHanded: false,
+    daytime: 'cycle', // cycle | day | night
   },
   stats: { kills: 0, cops: 0, cars: 0, missions: 0 },
+  light: { night: 0, tint: null }, // set by main: 0 = noon, 1 = midnight
   events: {}, // hook functions set by main: crash, vehicleExploded, pedKilled, pedHurt, shots
   nextId: 1,
 };

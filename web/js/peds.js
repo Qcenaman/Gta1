@@ -352,6 +352,7 @@ export class PedRenderer {
     const box = shadedGeometry(new THREE.BoxGeometry(1, 1, 1));
     const ball = shadedGeometry(new THREE.IcosahedronGeometry(1, 1));
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    this.mat = mat;
     const mk = (geo, n, m = mat) => {
       const im = new THREE.InstancedMesh(geo, m, n);
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -365,7 +366,8 @@ export class PedRenderer {
     this.head = mk(ball, max);
     this.arms = mk(box, max * 2);
     this.legs = mk(box, max * 2);
-    this.gun = mk(box, max, new THREE.MeshBasicMaterial({ color: 0x1b1c1f }));
+    this.gunMat = new THREE.MeshBasicMaterial({ color: 0x1b1c1f });
+    this.gun = mk(box, max, this.gunMat);
     const shGeo = new THREE.CircleGeometry(0.42, 10).rotateX(-Math.PI / 2);
     this.shadow = mk(shGeo, max, shadowMat);
     this.shadow.renderOrder = 1;
@@ -402,6 +404,10 @@ export class PedRenderer {
     this.arms.setMatrixAt(s * 2, ZERO); this.arms.setMatrixAt(s * 2 + 1, ZERO);
     this.legs.setMatrixAt(s * 2, ZERO); this.legs.setMatrixAt(s * 2 + 1, ZERO);
     this.gun.setMatrixAt(s, ZERO); this.shadow.setMatrixAt(s, ZERO);
+  }
+  setTint(tint) {
+    this.mat.color.copy(tint);
+    this.gunMat.color.setHex(0x1b1c1f).multiply(tint);
   }
   update(peds, camX, camZ, viewR) {
     for (const p of peds) {

@@ -24,6 +24,7 @@ const PVS = /* glsl */ `
     gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
   }`;
 const PFS = /* glsl */ `
+  uniform vec3 uTint;
   varying vec2 vUv;
   varying vec4 vColor;
   varying float vShape;
@@ -44,7 +45,7 @@ const PFS = /* glsl */ `
       a = smoothstep(1.0, 0.0, r);
       a = a * a;
     }
-    gl_FragColor = vec4(vColor.rgb, vColor.a * a);
+    gl_FragColor = vec4(vColor.rgb * uTint, vColor.a * a);
   }`;
 
 class QuadPool {
@@ -68,6 +69,7 @@ class QuadPool {
     this.mat = new THREE.ShaderMaterial({
       vertexShader: PVS, fragmentShader: PFS, transparent: true, depthWrite: false,
       blending, depthTest: true,
+      uniforms: { uTint: { value: new THREE.Color(1, 1, 1) } },
     });
     this.mesh = new THREE.Mesh(g, this.mat);
     this.mesh.frustumCulled = false;
@@ -205,6 +207,7 @@ export class FX {
     this.shake = 0;
     this.popups = [];
   }
+  setTint(tint) { this.alpha.mat.uniforms.uTint.value.copy(tint); }
   update(dt) {
     this.alpha.update(dt);
     this.add.update(dt);

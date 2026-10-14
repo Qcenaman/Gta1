@@ -277,6 +277,56 @@ const MAT = {
 const glowGeo = new THREE.CircleGeometry(1, 16).rotateX(-Math.PI / 2);
 let shadowGeos = {};
 
+// headlight cones + tail-light glow, only visible at night
+export const lightMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uNight: { value: 0 } },
+  vertexShader: `attribute vec3 color; attribute float kind; varying vec3 vC; varying vec2 vUv; varying float vK;
+    void main(){ vC = color; vUv = uv; vK = kind; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform float uNight; varying vec3 vC; varying vec2 vUv; varying float vK;
+    void main(){
+      float a;
+      if (vK < 0.5) { float across = abs(vUv.y - 0.5) * 2.0; a = pow(1.0 - vUv.x, 1.5) * (1.0 - across * across) * 0.5; }
+      else { a = pow(max(0.0, 1.0 - length(vUv - 0.5) * 2.0), 2.0) * 0.9; }
+      a *= uNight;
+      gl_FragColor = vec4(vC * a, a);
+    }`,
+});
+const lightGeos = {};
+function lightGeometry(t) {
+  const key = t.L + ':' + t.W;
+  if (lightGeos[key]) return lightGeos[key];
+  const pos = [], uv = [], col = [], kind = [], idx = [];
+  const quad = (pts, uvs, c, k) => {
+    const n = pos.length / 3;
+    for (const p of pts) pos.push(p[0], p[1], p[2]);
+    uv.push(...uvs);
+    for (let i = 0; i < 4; i++) { col.push(...c); kind.push(k); }
+    idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+  };
+  const hl = t.L / 2, hw = t.W / 2, y = 0.06;
+  const near = hl - 0.1, far = hl + 11;
+  quad([[near, y, -hw * 0.85], [near, y, hw * 0.85], [far, y, hw * 2.8], [far, y, -hw * 2.8]], [0, 0, 0, 1, 1, 1, 1, 0], [1, 0.93, 0.75], 0);
+  for (const s of [-1, 1]) {
+    const cx = -hl - 0.25, cz = s * (hw - 0.35), r = 0.9;
+    quad([[cx - r, y + 0.02, cz - r], [cx - r, y + 0.02, cz + r], [cx + r, y + 0.02, cz + r], [cx + r, y + 0.02, cz - r]], [0, 0, 0, 1, 1, 1, 1, 0], [1, 0.12, 0.08], 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('kind', new THREE.Float32BufferAttribute(kind, 1));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  return (lightGeos[key] = g);
+}
+
+export function setVehicleLighting(night, tint) {
+  lightMat.uniforms.uNight.value = night;
+  MAT.detail.color.copy(tint);
+  MAT.burnt.color.setHex(0x3a3a3a).multiply(tint);
+}
+
 export function setVehicleShadowMaterial(m) { MAT.shadow = m; }
 
 export function updateSirenMaterials(time) {
@@ -353,6 +403,10 @@ export class Vehicle {
       this.glowR.visible = this.glowB.visible = false;
       grp.add(this.glowR, this.glowB);
     }
+    this.lights = new THREE.Mesh(lightGeometry(this.t), lightMat);
+    this.lights.renderOrder = 4;
+    this.lights.visible = false;
+    grp.add(this.lights);
     this.mesh = grp;
     // shadow (separate so it can be offset in world space)
     const key = this.type;
@@ -567,12 +621,15 @@ export class Vehicle {
       this.prevWheel = w;
       if (rand() < this.skid * 0.4) G.fx.smoke(w[0][0], 0.3, w[0][1], 0.5, 0.75, 0.8);
     } else this.prevWheel = null;
-    // damage tint
+    // damage + time-of-day tint
+    const tint = G.light.tint;
     if (!this.dead) {
       const k = 0.55 + 0.45 * clamp(this.health / t.health, 0, 1);
       tmpPaint.set(this.paintHex).multiplyScalar(k);
-      this.paintMat.color.copy(tmpPaint);
-    }
+    } else tmpPaint.set('#2b2a29');
+    if (tint) tmpPaint.multiply(tint);
+    this.paintMat.color.copy(tmpPaint);
+    this.lights.visible = !this.dead && G.light.night > 0.05 && !!(this.driver || this.ai);
     // siren visuals
     if (this.redMesh) {
       const on = this.sirenOn && !this.dead;

@@ -2,12 +2,12 @@
 import * as THREE from 'three';
 import { G } from './game.js';
 import { TILE } from './consts.js';
-import { clamp, dist, rand, randRange, pick } from './util.js';
+import { clamp, dist, rand, randRange, pick, smoothstep } from './util.js';
 import { generateCity, makeQueries } from './citygen.js';
 import { buildWorld } from './world3d.js';
 import { initPhysics, SpatialHash } from './physics.js';
 import { FX } from './fx.js';
-import { spawnVehicle, removeVehicle, collideVehicles, setVehicleShadowMaterial, updateSirenMaterials } from './vehicles.js';
+import { spawnVehicle, removeVehicle, collideVehicles, setVehicleShadowMaterial, updateSirenMaterials, setVehicleLighting } from './vehicles.js';
 import { spawnPed, removePed, PedRenderer, panic } from './peds.js';
 import { Player } from './player.js';
 import { Traffic, driveTraffic, rejoinTraffic } from './traffic.js';
@@ -436,6 +436,38 @@ function carVsPed(v, p) {
   }
 }
 
+// ------------------------------------------------------------------ time of day
+const DAY_LEN = 480; // seconds for a full day/night cycle
+const C_DAY = new THREE.Color(1, 1, 1), C_NIGHT = new THREE.Color(0.33, 0.39, 0.6), C_DUSK = new THREE.Color(1.0, 0.8, 0.66);
+const SEA = new THREE.Color(0x16485f);
+const tint = new THREE.Color(), clear = new THREE.Color();
+G.light.tint = tint;
+let lastNightKey = -1;
+function updateLighting() {
+  const mode = G.settings.daytime;
+  let k;
+  if (G.state === 'title') k = 0.5;
+  else if (mode === 'day') k = 0;
+  else if (mode === 'night') k = 1;
+  else {
+    const t = ((G.time + DAY_LEN * 0.06) / DAY_LEN) % 1;
+    k = smoothstep(0.4, 0.55, t) * (1 - smoothstep(0.9, 1.0, t));
+  }
+  const key = Math.round(k * 200);
+  if (key === lastNightKey) return;
+  lastNightKey = key;
+  G.light.night = k;
+  tint.copy(C_DAY).lerp(C_NIGHT, k);
+  const warm = Math.sin(Math.PI * clamp(k * 1.6, 0, 1));
+  tint.multiply(clear.copy(C_DAY).lerp(C_DUSK, warm * 0.55));
+  const lights = smoothstep(0.22, 0.65, k);
+  world.setNight(lights, tint);
+  setVehicleLighting(lights, tint);
+  G.pedRender.setTint(tint);
+  G.fx.setTint(tint);
+  renderer.setClearColor(clear.copy(SEA).multiply(tint));
+}
+
 // ------------------------------------------------------------------ frame loop
 let last = performance.now();
 let acc = 0;
@@ -510,6 +542,7 @@ function frameUpdate(dt) {
   }
   G.pedRender.update(G.peds, G.cam.cx, G.cam.cz, Math.max(G.cam.halfW, G.cam.halfH) + 10);
   world.setTime(G.realTime);
+  updateLighting();
   // audio
   const au = G.audio;
   if (au.ctx) {
@@ -681,7 +714,18 @@ function tryFullscreen() {
 }
 
 // debug hooks for automated testing
-window.__game = { G, newGame, simStep, spawnVehicle, spawnPed, explode, playerDown, debug: () => ({ downT, state: G.state }) };
+window.__game = {
+  G, newGame, simStep, spawnVehicle, spawnPed, explode, playerDown,
+  debug: () => ({ downT, state: G.state }),
+  // run the simulation without rendering (used by automated tests)
+  fastForward(seconds) {
+    const n = Math.round(seconds * 60);
+    for (let i = 0; i < n; i++) {
+      simStep(STEP);
+      if (i % 4 === 0) frameUpdate(STEP * 4);
+    }
+  },
+};
 
 boot().catch((e) => {
   console.error(e);
