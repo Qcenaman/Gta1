@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The game itself lives in ../../web. `python3 tools/build.py` bundles it into ../../dist/www;
+// if that hasn't been run, the unbundled sources are packaged instead (they work the same on
+// any WebView from 2021 onwards).
+def webRoot = rootProject.file('../dist/www').exists() ? rootProject.file('../dist/www') : rootProject.file('../web')
+def generatedAssets = layout.buildDirectory.dir('generated/webassets')
+
+tasks.register('copyWebAssets', Copy) {
+    from webRoot
+    into generatedAssets.map { it.dir('www') }
+}
+
+android {
+    namespace 'com.qcenaman.crosstownheat'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.qcenaman.crosstownheat'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            // CI can override these with repository secrets; the bundled key keeps updates installable.
+            storeFile file(System.getenv('KEYSTORE_FILE') ?: '../keystore/crosstown-heat.jks')
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: 'crosstownheat'
+            keyAlias System.getenv('KEY_ALIAS') ?: 'crosstown'
+            keyPassword System.getenv('KEY_PASSWORD') ?: 'crosstownheat'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += generatedAssets.get().asFile
+        }
+    }
+}
+
+tasks.named('preBuild') { dependsOn 'copyWebAssets' }

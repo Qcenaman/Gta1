@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crosstown Heat</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="A top-down open-city crime game: steal cars, take payphone jobs and lose the heat.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700&family=VT323&display=swap">
+<style>
+/* Layout: a full-bleed 3D city with a sparse HUD hugging the corners and controls in the thumb zones. */
+:root {
+  --ink: #0b0d10;
+  --panel: rgba(11, 13, 16, 0.74);
+  --line: rgba(243, 239, 227, 0.16);
+  --signal: #ffc61a;
+  --chalk: #f3efe3;
+  --dim: #a9a597;
+  --siren-r: #ff3b3b;
+  --siren-b: #3d7bff;
+  --lcd: #b9d98c;
+  --lcd-ink: #1a2612;
+  --good: #4fd17b;
+  --bad: #ff5a4a;
+  --armor: #4a8bff;
+  --f-display: 'Bungee', Impact, 'Arial Black', sans-serif;
+  --f-ui: 'Barlow Condensed', 'Roboto Condensed', 'Arial Narrow', sans-serif-condensed, sans-serif;
+  --f-lcd: 'VT323', 'Courier New', monospace;
+  --sl: env(safe-area-inset-left, 0px);
+  --sr: env(safe-area-inset-right, 0px);
+  --st: env(safe-area-inset-top, 0px);
+  --sb: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; background: var(--ink); color: var(--chalk); overflow: hidden; }
+body {
+  font-family: var(--f-ui); font-size: 16px;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent; overscroll-behavior: none;
+  padding-left: max(16px, var(--sl)); padding-right: max(16px, var(--sr));
+}
+canvas#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------- HUD */
+#hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+#hud[hidden] { display: none !important; }
+.tl { position: absolute; top: calc(10px + var(--st)); left: calc(12px + var(--sl)); display: flex; gap: 10px; align-items: flex-start; }
+.money { display: flex; flex-direction: column; gap: 5px; }
+.cashrow { display: flex; align-items: center; gap: 8px; }
+#cash { font-family: var(--f-display); font-size: 24px; line-height: 1; color: var(--signal); letter-spacing: 0.02em;
+  text-shadow: 0 2px 0 #000, 0 0 12px rgba(0,0,0,0.6); font-variant-numeric: tabular-nums; transition: transform .15s; }
+#cash.pulse { transform: scale(1.12); }
+#mult { font-family: var(--f-ui); font-weight: 700; font-size: 15px; padding: 1px 7px; border-radius: 6px; border: 1.5px solid var(--signal);
+  color: var(--signal); background: rgba(0,0,0,0.55); }
+.bars { display: flex; flex-direction: column; gap: 3px; width: 128px; }
+.bar { height: 6px; background: rgba(0,0,0,0.55); border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,0.4); }
+.bar > i { display: block; height: 100%; width: 100%; background: var(--good); transform-origin: left; transition: transform .2s, background .3s; }
+#armorbar > i { background: var(--armor); }
+#lives { font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chalk); text-shadow: 0 1px 2px #000; }
+.iconbtn { pointer-events: auto; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+  display: grid; place-items: center; cursor: pointer; padding: 0; }
+.iconbtn svg { width: 18px; height: 18px; }
+
+.tc { position: absolute; top: calc(8px + var(--st)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(44vw, 400px); }
+#pager { width: 100%; box-sizing: border-box; background: linear-gradient(#c3e195, var(--lcd)); color: var(--lcd-ink); border-radius: 8px;
+  padding: 3px 9px 4px; font-family: var(--f-lcd); font-size: 17px; line-height: 1.02; border: 3px solid #23272c;
+  box-shadow: inset 0 0 12px rgba(40,60,20,0.35), 0 3px 10px rgba(0,0,0,0.5); transition: opacity .4s, transform .3s; pointer-events: auto; cursor: pointer; }
+#pager .tag { font-family: var(--f-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em; opacity: 0.65; display: block; }
+#pager.idle { opacity: 0.62; }
+#pager.idle #pagertext { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pager.flash { animation: pagerIn .45s ease-out; }
+@keyframes pagerIn { from { transform: translateY(-14px); opacity: 0.2; } to { transform: none; opacity: 1; } }
+#timer { font-family: var(--f-display); font-size: 22px; color: var(--chalk); text-shadow: 0 2px 0 #000; font-variant-numeric: tabular-nums; }
+#timer.low { color: var(--bad); }
+#mtitle { font-family: var(--f-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--signal); text-shadow: 0 1px 2px #000; }
+
+.tr { position: absolute; top: calc(10px + var(--st)); right: calc(12px + var(--sr)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#wanted { display: flex; gap: 4px; padding: 4px 6px; border-radius: 8px; background: rgba(0,0,0,0.45); }
+#wanted i { width: 15px; height: 10px; border-radius: 3px; border: 1.5px solid rgba(243,239,227,0.35); background: transparent; }
+#wanted i.on { border-color: transparent; background: var(--siren-r); box-shadow: 0 0 8px var(--siren-r); }
+#wanted i.on.b { background: var(--siren-b); box-shadow: 0 0 8px var(--siren-b); }
+#wanted.flash i.on { animation: sirenFlash .5s steps(2) infinite; }
+#wanted.lost i.on { opacity: 0.45; }
+@keyframes sirenFlash { 50% { background: var(--siren-b); box-shadow: 0 0 10px var(--siren-b); } }
+#minimap { width: 104px; height: 104px; border-radius: 50%; border: 2px solid rgba(243,239,227,0.5); box-shadow: 0 3px 12px rgba(0,0,0,0.6); pointer-events: auto; background: #10151a; }
+#weapon { pointer-events: auto; display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-radius: 9px; background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
+#weapon canvas { width: 34px; height: 34px; }
+#ammo { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; min-width: 2.2em; text-align: right; }
+
+#big { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+#big h2 { margin: 0; font-family: var(--f-display); font-size: clamp(34px, 7vw, 64px); letter-spacing: 0.02em; color: var(--signal); text-shadow: 0 4px 0 #000, 0 0 24px rgba(0,0,0,.7); }
+#big.bad h2 { color: var(--bad); }
+#big.good h2 { color: var(--good); }
+#big p { margin: 4px 0 0; font-size: 20px; font-weight: 600; text-shadow: 0 2px 2px #000; }
+#big.show { animation: bigIn .5s cubic-bezier(.2,1.6,.4,1); }
+@keyframes bigIn { from { transform: translate(-50%, -50%) scale(.6); opacity: 0; } }
+
+#toasts { position: absolute; left: 50%; bottom: calc(30% + var(--sb)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.toast { background: var(--panel); border: 1px solid var(--line); padding: 4px 12px; border-radius: 8px; font-weight: 600; font-size: 16px; animation: toastIn .25s ease-out; white-space: nowrap; }
+.toast.out { opacity: 0; transition: opacity .5s; }
+@keyframes toastIn { from { transform: translateY(8px); opacity: 0; } }
+#radio { position: absolute; left: 50%; bottom: calc(12px + var(--sb)); transform: translateX(-50%); pointer-events: auto; cursor: pointer;
+  font-family: var(--f-lcd); font-size: 18px; padding: 2px 12px; border-radius: 8px; background: rgba(0,0,0,0.55); color: var(--signal); border: 1px solid var(--line); }
+#vname { position: absolute; right: calc(150px + var(--sr)); bottom: calc(150px + var(--sb)); font-family: var(--f-display); font-size: 20px; color: var(--chalk); text-shadow: 0 2px 0 #000; transition: opacity .6s; }
+#rotate { position: absolute; left: 50%; bottom: calc(46% + var(--sb)); transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: 15px; text-align: center; pointer-events: auto; max-width: 70vw; }
+#fps { position: absolute; left: calc(12px + var(--sl)); bottom: calc(6px + var(--sb)); font-size: 11px; color: var(--dim); }
+
+/* ---------------------------------------------------------------- touch controls */
+#controls { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+#controls[hidden] { display: none !important; }
+#stickzone { position: absolute; left: 0; bottom: 0; width: 52%; height: 78%; pointer-events: auto; touch-action: none; }
+#stickbase { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0.0; transition: opacity .15s; }
+#stickbase.on { opacity: 1; }
+#stickbase .ring { position: absolute; left: -60px; top: -60px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(243,239,227,0.35); background: rgba(0,0,0,0.18); }
+#stickknob { position: absolute; left: -27px; top: -27px; width: 54px; height: 54px; border-radius: 50%; background: rgba(243,239,227,0.42); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+#stickhint { position: absolute; left: calc(70px + var(--sl)); bottom: calc(64px + var(--sb)); width: 110px; height: 110px; margin: -55px; border-radius: 50%; border: 2px dashed rgba(243,239,227,0.22); display: grid; place-items: center; font-weight: 600; font-size: 13px; letter-spacing: .1em; color: rgba(243,239,227,0.45); transition: opacity .4s; }
+.btn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; display: grid; place-items: center; text-align: center;
+  background: rgba(11,13,16,0.48); border: 2px solid rgba(243,239,227,0.38); color: var(--chalk); box-shadow: 0 3px 10px rgba(0,0,0,0.35); }
+.btn span { display: block; font-weight: 700; font-size: 11px; letter-spacing: 0.12em; margin-top: 1px; }
+.btn svg { width: 46%; height: 46%; display: block; margin: 0 auto; }
+.btn.down { background: rgba(255,198,26,0.38); border-color: var(--signal); transform: scale(.95); }
+#btnA { width: 88px; height: 88px; right: calc(20px + var(--sr)); bottom: calc(22px + var(--sb)); border-color: rgba(255,198,26,0.7); }
+#btnB { width: 66px; height: 66px; right: calc(124px + var(--sr)); bottom: calc(18px + var(--sb)); }
+#btnC { width: 58px; height: 58px; right: calc(34px + var(--sr)); bottom: calc(126px + var(--sb)); }
+#btnB.dim { opacity: 0.45; }
+body.lefty #stickzone { left: auto; right: 0; }
+body.lefty #btnA { right: auto; left: calc(20px + var(--sl)); }
+body.lefty #btnB { right: auto; left: calc(124px + var(--sl)); }
+body.lefty #btnC { right: auto; left: calc(34px + var(--sl)); }
+body.lefty #stickhint { left: auto; right: calc(70px + var(--sr)); }
+
+/* ---------------------------------------------------------------- screens */
+.screen { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  padding: calc(16px + var(--st)) max(16px, var(--sr)) calc(16px + var(--sb)) max(16px, var(--sl));
+  background: radial-gradient(120% 90% at 20% 50%, rgba(11,13,16,0.35), rgba(11,13,16,0.86)); overflow-y: auto; }
+.screen[hidden] { display: none !important; }
+.title-wrap { width: min(960px, 100%); display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+@media (max-width: 640px) { .title-wrap { grid-template-columns: 1fr; gap: 16px; } }
+.logo { margin: 0; font-family: var(--f-display); font-weight: 400; line-height: 0.92; font-size: clamp(40px, 8.5vw, 92px); color: var(--signal);
+  text-shadow: -3px 3px 0 var(--siren-r), 3px -3px 0 var(--siren-b), 0 8px 24px rgba(0,0,0,0.6); text-wrap: balance; }
+.logo small { display: block; font-size: 0.34em; color: var(--chalk); text-shadow: 0 2px 0 #000; letter-spacing: 0.04em; margin-top: 10px; }
+.tagline { margin: 12px 0 0; font-size: 19px; font-weight: 500; color: var(--chalk); max-width: 34ch; text-shadow: 0 1px 2px #000; }
+.coords { margin-top: 10px; font-family: var(--f-lcd); font-size: 17px; color: var(--lcd); opacity: 0.85; }
+.menu { display: flex; flex-direction: column; gap: 10px; }
+.mbtn { pointer-events: auto; cursor: pointer; text-align: left; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--line);
+  background: rgba(11,13,16,0.72); font-size: 20px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.mbtn small { font-weight: 500; font-size: 14px; letter-spacing: 0.02em; text-transform: none; color: var(--dim); }
+.mbtn.primary { background: var(--signal); color: #16130a; border-color: var(--signal); }
+.mbtn.primary small { color: #3c3418; }
+.mbtn:active { transform: scale(.98); }
+.best { font-size: 15px; color: var(--dim); margin-top: 4px; }
+.panel { width: min(640px, 100%); background: rgba(11,13,16,0.9); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; max-height: 100%; overflow-y: auto; box-sizing: border-box; }
+.panel h3 { margin: 0 0 10px; font-family: var(--f-display); font-weight: 400; font-size: 26px; color: var(--signal); }
+.panel p, .panel li { font-size: 17px; line-height: 1.35; color: var(--chalk); }
+.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.panel b { color: var(--signal); }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.row:last-of-type { border-bottom: 0; }
+.row label { font-size: 18px; font-weight: 600; }
+.row .sub { display: block; font-size: 14px; font-weight: 500; color: var(--dim); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex-shrink: 0; }
+.seg button { pointer-events: auto; cursor: pointer; border: 0; background: transparent; padding: 7px 11px; font-size: 15px; font-weight: 700; color: var(--dim); }
+.seg button.on { background: var(--signal); color: #16130a; }
+.panel .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.panel .actions .mbtn { flex: 1; justify-content: center; font-size: 18px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 6px 0 4px; }
+.stats div { background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.stats b { display: block; font-family: var(--f-display); font-weight: 400; font-size: 22px; color: var(--chalk); font-variant-numeric: tabular-nums; }
+.stats span { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+#loading { z-index: 9; flex-direction: column; gap: 10px; background: var(--ink); }
+#loading .logo { font-size: clamp(32px, 7vw, 64px); text-align: center; }
+#loading p { font-family: var(--f-lcd); font-size: 20px; color: var(--lcd); margin: 0; }
+#mapview { position: fixed; inset: 0; z-index: 6; display: grid; place-items: center; background: rgba(11,13,16,0.86); padding: calc(10px + var(--st)) max(16px, var(--sr)) calc(10px + var(--sb)) max(16px, var(--sl)); }
+#mapview[hidden] { display: none !important; }
+#bigmap { max-width: 100%; max-height: 100%; aspect-ratio: 1; height: min(92vh, 92vw); border-radius: 12px; border: 1px solid var(--line); }
+#mapclose { position: absolute; top: calc(12px + var(--st)); right: calc(14px + var(--sr)); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Game view"></canvas>
+
+<div id="hud" hidden>
+  <div class="tl">
+    <button class="iconbtn" id="pausebtn" aria-label="Pause"><svg viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="3" width="4" height="14" rx="1"/><rect x="12" y="3" width="4" height="14" rx="1"/></svg></button>
+    <div class="money">
+      <div class="cashrow"><span id="cash">$0000000</span><span id="mult">×1</span></div>
+      <div class="bars"><div class="bar" id="healthbar"><i></i></div><div class="bar" id="armorbar" hidden><i></i></div></div>
+      <div id="lives">Lives 4</div>
+    </div>
+  </div>
+  <div class="tc">
+    <div id="pager" class="idle"><span class="tag">PAGER</span><span id="pagertext">Welcome to Halcyon Bay.</span></div>
+    <div id="mtitle" hidden></div>
+    <div id="timer" hidden>0:00</div>
+  </div>
+  <div class="tr">
+    <div id="wanted" aria-label="Heat level"><i></i><i></i><i></i><i></i><i></i></div>
+    <canvas id="minimap" width="208" height="208" aria-label="Map"></canvas>
+    <button id="weapon" aria-label="Switch weapon"><canvas id="wicon" width="68" height="68"></canvas><span id="ammo">∞</span></button>
+  </div>
+  <div id="big" hidden><h2 id="bigtitle"></h2><p id="bigsub"></p></div>
+  <div id="toasts"></div>
+  <button id="radio" hidden>Radio</button>
+  <div id="vname" hidden></div>
+  <div id="rotate" hidden>Turn your phone sideways for a wider view</div>
+  <div id="fps" hidden></div>
+</div>
+
+<div id="controls" hidden>
+  <div id="stickzone"><div id="stickbase"><div class="ring"></div><div id="stickknob"></div></div></div>
+  <div id="stickhint">MOVE</div>
+  <div class="btn" id="btnC" role="button" aria-label="Swap weapon or horn"><div><svg id="iconC" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></svg><span id="labelC">SWAP</span></div></div>
+  <div class="btn" id="btnB" role="button" aria-label="Enter or exit car"><div><svg id="iconB" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></svg><span id="labelB">ENTER</span></div></div>
+  <div class="btn" id="btnA" role="button" aria-label="Fire or brake"><div><svg id="iconA" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></svg><span id="labelA">FIRE</span></div></div>
+</div>
+
+<div class="screen" id="title" hidden>
+  <div class="title-wrap">
+    <div>
+      <h1 class="logo">Crosstown Heat<small>Halcyon Bay, 1997</small></h1>
+      <p class="tagline">Steal cars, answer ringing payphones and stay one block ahead of the heat.</p>
+      <div class="coords">40.71°N · 3 bridges · 1 river · no rules</div>
+    </div>
+    <div class="menu">
+      <button class="mbtn primary" id="play">Play <small id="playsub">New game</small></button>
+      <button class="mbtn" id="cont" hidden>Continue <small id="contsub"></small></button>
+      <button class="mbtn" id="howbtn">How to play <small>Controls &amp; tips</small></button>
+      <button class="mbtn" id="setbtn">Settings <small>Steering, sound</small></button>
+      <div class="best" id="best"></div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="pause" hidden>
+  <div class="panel">
+    <h3>Paused</h3>
+    <div class="stats" id="pstats"></div>
+    <div class="actions">
+      <button class="mbtn primary" id="resume">Resume</button>
+      <button class="mbtn" id="psettings">Settings</button>
+      <button class="mbtn" id="phow">How to play</button>
+      <button class="mbtn" id="quit">Quit</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="how" hidden>
+  <div class="panel">
+    <h3>How to play</h3>
+    <ul>
+      <li><b>Move</b> by dragging anywhere on the left half of the screen. Push the stick further to run.</li>
+      <li><b>Steal a car:</b> stand next to one and tap <b>ENTER</b>. If someone is driving, they're getting out.</li>
+      <li><b>Drive:</b> point the stick where you want to go. Hold <b>BRAKE</b> to stop, keep holding to reverse. Brake while turning to slide.</li>
+      <li><b>Jobs:</b> a payphone rings somewhere. Follow the green arrow and walk up to it. Each job done raises your cash <b>multiplier</b>.</li>
+      <li><b>Heat:</b> crimes seen by cops raise the siren lights. Stay out of sight to cool off, grab a bribe badge, or drive onto a <b>Paint &amp; Go</b> pad for a $500 respray.</li>
+      <li><b>Crates</b> hold weapons, health, armor and cash. <b>SWAP</b> cycles weapons.</li>
+      <li>Keyboard: WASD to move or drive, Space fire/brake, E enter/exit, Q swap, H horn, R radio, P pause.</li>
+    </ul>
+    <div class="actions"><button class="mbtn primary" id="howclose">Got it</button></div>
+  </div>
+</div>
+
+<div class="screen" id="settings" hidden>
+  <div class="panel">
+    <h3>Settings</h3>
+    <div class="row"><label>Steering<span class="sub">Point: car turns toward the stick. Classic: up = gas, sideways = steer.</span></label>
+      <div class="seg" data-set="steering"><button data-v="direct">Point</button><button data-v="classic">Classic</button></div></div>
+    <div class="row"><label>Sound effects</label><div class="seg" data-set="sound"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+    <div class="row"><label>Car radio</label><div class="seg" data-set="music"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+    <div class="row"><label>Graphics<span class="sub">Low draws fewer pixels and people for older phones.</span></label>
+      <div class="seg" data-set="quality"><button data-v="auto">Auto</button><button data-v="high">High</button><button data-v="low">Low</button></div></div>
+    <div class="row"><label>Controls side</label><div class="seg" data-set="hand"><button data-v="right">Stick left</button><button data-v="left">Stick right</button></div></div>
+    <div class="actions"><button class="mbtn primary" id="setclose">Done</button></div>
+  </div>
+</div>
+
+<div class="screen" id="over" hidden>
+  <div class="panel">
+    <h3 id="overtitle">Game over</h3>
+    <div class="stats" id="ostats"></div>
+    <p id="overbest"></p>
+    <div class="actions"><button class="mbtn primary" id="again">Play again</button><button class="mbtn" id="totitle">Title</button></div>
+  </div>
+</div>
+
+<div id="mapview" hidden><canvas id="bigmap" width="640" height="640" aria-label="City map"></canvas><button class="iconbtn" id="mapclose" aria-label="Close map"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>
+
+<div class="screen" id="loading"><h1 class="logo">Crosstown Heat</h1><p id="loadmsg">Pouring the asphalt…</p></div>
+
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

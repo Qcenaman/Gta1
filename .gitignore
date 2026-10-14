@@ -1,0 +1,14 @@
+# build output
+build/
+dist/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+.gradle/
+*.iml
+.idea/
+.DS_Store
+node_modules/
+# local test pages
+dev/
