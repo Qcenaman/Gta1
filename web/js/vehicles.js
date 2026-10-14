@@ -334,8 +334,8 @@ export function updateSirenMaterials(time) {
   const a = ph < 0.5;
   MAT.red.color.setHex(a ? 0xff3535 : 0x5a1010);
   MAT.blue.color.setHex(a ? 0x10204a : 0x3a7bff);
-  MAT.glowRed.opacity = a ? 0.55 : 0.0;
-  MAT.glowBlue.opacity = a ? 0.0 : 0.55;
+  MAT.glowRed.opacity = a ? 0.38 : 0.0;
+  MAT.glowBlue.opacity = a ? 0.0 : 0.42;
 }
 
 const tmpPaint = new THREE.Color();
@@ -397,7 +397,7 @@ export class Vehicle {
       grp.add(this.redMesh, this.blueMesh);
       this.glowR = new THREE.Mesh(glowGeo, MAT.glowRed);
       this.glowB = new THREE.Mesh(glowGeo, MAT.glowBlue);
-      this.glowR.scale.setScalar(3.2); this.glowB.scale.setScalar(3.2);
+      this.glowR.scale.setScalar(2.6); this.glowB.scale.setScalar(2.6);
       this.glowR.position.set(-0.2, 0.08, -1.3); this.glowB.position.set(-0.2, 0.08, 1.3);
       this.glowR.renderOrder = 7; this.glowB.renderOrder = 7;
       this.glowR.visible = this.glowB.visible = false;

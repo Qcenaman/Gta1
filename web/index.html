@@ -92,6 +92,7 @@ button { font: inherit; color: inherit; }
 #wanted.flash i.on { animation: sirenFlash .5s steps(2) infinite; }
 #wanted.lost i.on { opacity: 0.45; }
 @keyframes sirenFlash { 50% { background: var(--siren-b); box-shadow: 0 0 10px var(--siren-b); } }
+.trrow { display: flex; gap: 8px; align-items: flex-start; }
 #minimap { width: 104px; height: 104px; border-radius: 50%; border: 2px solid rgba(243,239,227,0.5); box-shadow: 0 3px 12px rgba(0,0,0,0.6); pointer-events: auto; background: #10151a; }
 #weapon { pointer-events: auto; display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-radius: 9px; background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
 #weapon canvas { width: 34px; height: 34px; }
@@ -184,6 +185,21 @@ body.lefty #stickhint { left: auto; right: calc(70px + var(--sr)); }
 #mapview[hidden] { display: none !important; }
 #bigmap { max-width: 100%; max-height: 100%; aspect-ratio: 1; height: min(92vh, 92vw); border-radius: 12px; border: 1px solid var(--line); }
 #mapclose { position: absolute; top: calc(12px + var(--st)); right: calc(14px + var(--sr)); }
+/* portrait: stack the pager under the top bar and keep the player clear */
+@media (max-aspect-ratio: 1/1) {
+  .tc { top: calc(128px + var(--st)); width: calc(100vw - 28px - var(--sl) - var(--sr)); }
+  #minimap { width: 84px; height: 84px; }
+  #weapon canvas { width: 28px; height: 28px; }
+  #rotate { bottom: auto; top: calc(190px + var(--st)); }
+}
+/* short landscape screens */
+@media (max-height: 370px) and (min-aspect-ratio: 1/1) {
+  #minimap { width: 88px; height: 88px; }
+  #btnA { width: 78px; height: 78px; }
+  #btnB { width: 60px; height: 60px; right: calc(110px + var(--sr)); }
+  #btnC { width: 52px; height: 52px; bottom: calc(110px + var(--sb)); }
+  #pager { font-size: 16px; }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -206,8 +222,10 @@ body.lefty #stickhint { left: auto; right: calc(70px + var(--sr)); }
   </div>
   <div class="tr">
     <div id="wanted" aria-label="Heat level"><i></i><i></i><i></i><i></i><i></i></div>
-    <canvas id="minimap" width="208" height="208" aria-label="Map"></canvas>
-    <button id="weapon" aria-label="Switch weapon"><canvas id="wicon" width="68" height="68"></canvas><span id="ammo">∞</span></button>
+    <div class="trrow">
+      <button id="weapon" aria-label="Switch weapon"><canvas id="wicon" width="68" height="68"></canvas><span id="ammo">∞</span></button>
+      <canvas id="minimap" width="208" height="208" aria-label="Map"></canvas>
+    </div>
   </div>
   <div id="big" hidden><h2 id="bigtitle"></h2><p id="bigsub"></p></div>
   <div id="toasts"></div>

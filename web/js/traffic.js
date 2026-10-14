@@ -11,7 +11,7 @@ const tmp = [];
 export class Traffic {
   constructor(city) {
     this.city = city;
-    this.carTarget = 22;
+    this.carTarget = 32;
     this.pedTarget = 42;
     this.spawnT = 0;
     this.pedT = 0;
@@ -27,7 +27,7 @@ export class Traffic {
   }
 
   setQuality(q) {
-    this.carTarget = q === 'low' ? 14 : q === 'high' ? 28 : 22;
+    this.carTarget = q === 'low' ? 22 : q === 'high' ? 42 : 32;
     this.pedTarget = q === 'low' ? 28 : q === 'high' ? 54 : 42;
   }
 
@@ -54,7 +54,7 @@ export class Traffic {
       if (visible) v.sinceSeen = 0; else v.sinceSeen += dt;
       if (v.ai && v.ai.mode === 'traffic') civ++;
       const playerCar = G.player && (G.player.vehicle === v || G.player.lastCar === v);
-      const far = v.persistent || playerCar ? 260 : v.spot ? 125 : 175;
+      const far = v.persistent || playerCar ? 260 : v.spot ? 125 : 165;
       if (d > far && !visible && !v.mission) {
         if (v.spot && v.spot.vehicle === v) v.spot.vehicle = null;
         if (G.player && G.player.lastCar === v) G.player.lastCar = null;
@@ -65,7 +65,7 @@ export class Traffic {
       if (v.dead && v.sinceSeen > 20 && !v.mission) { removeVehicle(v); continue; }
     }
     if (this.spawnT <= 0 && civ < this.carTarget) {
-      this.spawnT = 0.15;
+      this.spawnT = 0.1;
       this.spawnTrafficCar(f);
     }
     // ---------------------------------------------------------- parked cars
@@ -81,7 +81,7 @@ export class Traffic {
         const d = dist(s.x, s.z, f.x, f.z);
         if (d > 95 || d < 20) continue;
         if (this.inView(s.x, s.z, 6)) continue;
-        if (s.state === undefined) s.state = rand() < 0.5 ? 'car' : 'empty';
+        if (s.state === undefined) s.state = rand() < 0.62 ? 'car' : 'empty';
         if (s.state !== 'car') continue;
         if (this.blocked(s.x, s.z, 3.5)) continue;
         const type = pick(['sedan', 'sedan', 'compact', 'compact', 'pickup', 'van', 'sports', 'muscle', 'taxi']);
@@ -132,7 +132,7 @@ export class Traffic {
   }
 
   spawnTrafficCar(f, forceType) {
-    const s = this.laneSpot(f, 70, 150);
+    const s = this.laneSpot(f, 58, 140);
     if (!s) return null;
     if (this.blocked(s.x, s.z, 7)) return null;
     let type = forceType || (rand() < 0.06 ? 'police' : randomCivType());

@@ -564,8 +564,28 @@ function frameUpdate(dt) {
   }
   if (pl && G.state !== 'title') {
     G.hud.update(dt);
-    G.hud.buttons(pl.inCar, !pl.inCar && !!pl.nearestCar(4.2));
+    const nearCar = !pl.inCar && !!pl.nearestCar(4.2);
+    G.hud.buttons(pl.inCar, nearCar);
+    if (G.state === 'playing') tips(nearCar);
   }
+}
+
+// one-time hints for new players
+function tips(nearCar) {
+  const seen = save.tips || (save.tips = {});
+  const show = (key, text) => {
+    if (seen[key]) return;
+    seen[key] = 1;
+    G.hud.toast(text);
+    writeSave(save);
+  };
+  const pl = G.player;
+  if (G.time > 2 && !seen.move) show('move', G.input.touchMode || !G.input.keys.size ? 'Drag on the left side to walk' : 'WASD to walk');
+  if (nearCar && G.time > 4) show('enter', 'Tap ENTER to take this car');
+  if (pl.inCar) show('drive', G.settings.steering === 'classic' ? 'Stick up to drive, sideways to steer' : 'Point the stick where you want to go');
+  if (pl.inCar && pl.vehicle.speed > 12) show('brake', 'Hold BRAKE to stop, keep holding to reverse');
+  if (G.police.level > 0) show('heat', 'Cops saw that. Lose them, respray, or grab a bribe badge');
+  if (pl.weapon !== 'fists') show('gun', 'FIRE aims at the nearest threat. SWAP changes weapons');
 }
 
 // ------------------------------------------------------------------ UI

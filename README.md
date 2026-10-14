@@ -13,9 +13,8 @@ Everything here is original — city, cars, characters, jobs and sound (all synt
 - **Android app:** download [`apk/CrosstownHeat.apk`](apk/CrosstownHeat.apk) (or the file attached to the
   [latest release](../../releases/latest)) on your phone and open it. Android will ask you to allow
   installs from your browser or file manager the first time.
-- **In the browser:** the `gh-pages` branch holds the web build. Turn on GitHub Pages for this repo
-  (Settings → Pages → Deploy from branch → `gh-pages` / root) and it will be playable at
-  `https://qcenaman.github.io/Gta1/`. Add it to your home screen for a full-screen, offline-capable app.
+- **In the browser:** <https://qcenaman.github.io/Gta1/> (published from the `gh-pages` branch).
+  In Chrome, *Add to Home screen* turns it into a full-screen app that also works offline.
 
 Hold the phone sideways for the best view.
 

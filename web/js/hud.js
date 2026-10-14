@@ -39,6 +39,7 @@ export class HUD {
     this.vnameT = 0;
     this.rotateDismissed = false;
     this.el.rotate.addEventListener('pointerdown', () => { this.rotateDismissed = true; this.el.rotate.hidden = true; });
+    this.rotateT = 6;
   }
 
   buildMap(city) {
@@ -180,6 +181,7 @@ export class HUD {
     if (this.bigT > 0) { this.bigT -= dt; if (this.bigT <= 0) e.big.hidden = true; }
     if (this.vnameT > 0) { this.vnameT -= dt; if (this.vnameT <= 0.6) e.vname.style.opacity = 0; if (this.vnameT <= 0) e.vname.hidden = true; }
     const portrait = innerHeight > innerWidth;
+    if (portrait && this.rotateT > 0) { this.rotateT -= dt; if (this.rotateT <= 0) this.rotateDismissed = true; }
     this.set('rot', portrait && !this.rotateDismissed, (v) => { e.rotate.hidden = !v; });
     // minimap at 15 fps
     this.mapT -= dt;
