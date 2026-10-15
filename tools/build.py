@@ -19,7 +19,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, 'web')
 DIST = os.path.join(ROOT, 'dist')
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js'
 
 

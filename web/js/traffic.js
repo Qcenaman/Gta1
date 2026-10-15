@@ -2,20 +2,26 @@
 // spawn just out of view around the player and despawn far away.
 import { G } from './game.js';
 import { TILE, T, WALKABLE, D } from './consts.js';
-import { clamp, rand, randRange, pick, angDiff, dist } from './util.js';
+import { clamp, lerp, rand, randRange, pick, angDiff, dist } from './util.js';
 import { spawnVehicle, removeVehicle, randomCivType, VTYPES } from './vehicles.js';
 import { spawnPed, removePed } from './peds.js';
 
 const tmp = [];
 
+// Share of the daytime crowd that is still out in the middle of the night.
+const NIGHT_TRAFFIC = 0.5;
+const NIGHT_PEDS = 0.4;
+
 export class Traffic {
   constructor(city) {
     this.city = city;
     this.carTarget = 32;
-    this.pedTarget = 42;
+    this.pedTarget = 62;
     this.spawnT = 0;
     this.pedT = 0;
     this.parkT = 0;
+    this.carCullT = 0;
+    this.pedCullT = 0;
     // candidate tiles for pedestrians
     this.pedTiles = [];
     const { W, H, tiles, district } = city;
@@ -28,7 +34,16 @@ export class Traffic {
 
   setQuality(q) {
     this.carTarget = q === 'low' ? 22 : q === 'high' ? 42 : 32;
-    this.pedTarget = q === 'low' ? 28 : q === 'high' ? 54 : 42;
+    this.pedTarget = q === 'low' ? 42 : q === 'high' ? 80 : 62;
+  }
+
+  /** how many moving cars and pedestrians to keep around: the daytime numbers, thinned out after dark */
+  targets() {
+    const n = G.light ? G.light.night : 0;
+    return {
+      cars: Math.round(this.carTarget * lerp(1, NIGHT_TRAFFIC, n)),
+      peds: Math.round(this.pedTarget * lerp(1, NIGHT_PEDS, n)),
+    };
   }
 
   focus() {
@@ -44,15 +59,17 @@ export class Traffic {
 
   update(dt) {
     const f = this.focus();
+    const target = this.targets();
     // ---------------------------------------------------------- traffic cars
     this.spawnT -= dt;
+    this.carCullT -= dt;
     let civ = 0;
+    let cull = null, cullN = 0;
     for (let i = G.vehicles.length - 1; i >= 0; i--) {
       const v = G.vehicles[i];
       const d = dist(v.x, v.z, f.x, f.z);
       const visible = this.inView(v.x, v.z, 12);
       if (visible) v.sinceSeen = 0; else v.sinceSeen += dt;
-      if (v.ai && v.ai.mode === 'traffic') civ++;
       const playerCar = G.player && (G.player.vehicle === v || G.player.lastCar === v);
       const far = v.persistent || playerCar ? 260 : v.spot ? 125 : 165;
       if (d > far && !visible && !v.mission) {
@@ -63,8 +80,18 @@ export class Traffic {
       }
       // wrecks clean up once out of sight for a while
       if (v.dead && v.sinceSeen > 20 && !v.mission) { removeVehicle(v); continue; }
+      if (v.ai && v.ai.mode === 'traffic') {
+        civ++;
+        // when the streets empty out, drop a random unseen ordinary car (random keeps the thinning even)
+        if (!visible && v.sinceSeen > 2 && d > 50 && !v.persistent && !v.mission && !playerCar && rand() * ++cullN < 1) cull = v;
+      }
     }
-    if (this.spawnT <= 0 && civ < this.carTarget) {
+    if (civ > target.cars + 1 && cull && this.carCullT <= 0) {
+      this.carCullT = 0.3;
+      removeVehicle(cull);
+      civ--;
+    }
+    if (this.spawnT <= 0 && civ < target.cars) {
       this.spawnT = 0.1;
       this.spawnTrafficCar(f);
     }
@@ -92,18 +119,29 @@ export class Traffic {
     }
     // ---------------------------------------------------------- pedestrians
     let civPeds = 0;
+    let cullP = null, cullPN = 0;
     for (let i = G.peds.length - 1; i >= 0; i--) {
       const p = G.peds[i];
       if (p.kind === 'player' || p.persistent) continue;
       const d = dist(p.x, p.z, f.x, f.z);
-      if (!p.brain) civPeds++;
       const far = p.brain ? 140 : 95;
-      if (d > far && !this.inView(p.x, p.z, 6)) { removePed(p); continue; }
-      if (p.state === 'dead' && p.timer > 40 && !this.inView(p.x, p.z, 4)) removePed(p);
+      const seen = this.inView(p.x, p.z, 6);
+      if (d > far && !seen) { removePed(p); continue; }
+      if (p.state === 'dead' && p.timer > 40 && !this.inView(p.x, p.z, 4)) { removePed(p); continue; }
+      if (!p.brain) {
+        civPeds++;
+        if (!seen && !p.hidden && d > 30 && rand() * ++cullPN < 1) cullP = p;
+      }
+    }
+    this.pedCullT -= dt;
+    if (civPeds > target.peds + 1 && cullP && this.pedCullT <= 0) {
+      this.pedCullT = 0.2;
+      removePed(cullP);
+      civPeds--;
     }
     this.pedT -= dt;
-    if (this.pedT <= 0 && civPeds < this.pedTarget) {
-      this.pedT = 0.08;
+    if (this.pedT <= 0 && civPeds < target.peds) {
+      this.pedT = 0.06;
       this.spawnPedNear(f);
     }
   }
